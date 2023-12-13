@@ -281,7 +281,7 @@ def versionFromBuildSystemInstaller(installerVersion : MojangVersionFile, instal
     for upstreamLib in installerVersion.libraries:
         mmcLib = MultiMCLibrary(upstreamLib.to_json())
         if mmcLib.name.group == "net.minecraftforge":
-            if mmcLib.name.artifact == "forge":
+            if mmcLib.name.artifact == "forge" and not mmcLib.name.classifier:
                 fixedName = mmcLib.name
                 fixedName.classifier = "launcher"
                 mmcLib.downloads.artifact.path = fixedName.getPath()
@@ -289,6 +289,10 @@ def versionFromBuildSystemInstaller(installerVersion : MojangVersionFile, instal
                 mmcLib.name = fixedName
                 libraries.append(mmcLib)
                 continue
+        # forge 49.0.4+ sets an empty client download https://github.com/MinecraftForge/MinecraftForge/commit/5c15aa3322db8a3f95e97390638f80eb6d4e5d15
+        # so we need clear the url to stop mmc from downloading it
+        if not mmcLib.downloads.artifact.url and mmcLib.name.classifier == "client":
+            mmcLib.downloads.artifact = None
         if mmcLib.name.isLog4j():
             continue
         libraries.append(mmcLib)
@@ -299,6 +303,12 @@ def versionFromBuildSystemInstaller(installerVersion : MojangVersionFile, instal
     mcArgs = "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --versionType ${version_type}"
     for arg in installerVersion.arguments.game:
         mcArgs += " %s" % arg
+    if "--fml.forgeGroup" not in installerVersion.arguments.game:
+        mcArgs += " --fml.forgeGroup net.minecraftforge"
+    if "--fml.forgeVersion" not in installerVersion.arguments.game:
+        mcArgs += " --fml.forgeVersion %s" % version.rawVersion
+    if "--fml.mcVersion" not in installerVersion.arguments.game:
+        mcArgs += " --fml.mcVersion ${version_name}"
     result.minecraftArguments = mcArgs
     return result
 
